@@ -256,7 +256,7 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         moveRequestUid(oldPath, newPath);
 
         const content = jsonToBru(jsonData);
-        await writeFile(newPath, content);
+        await writeFile(oldPath, content);
         await renameUsingTempPath(oldPath, newPath);
       } else {
         throw new Error(`File is not a bru file: ${oldPath}`);
