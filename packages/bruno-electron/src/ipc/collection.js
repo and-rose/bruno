@@ -7,6 +7,7 @@ const { envJsonToBru, bruToJson, jsonToBru, jsonToCollectionBru } = require('../
 const {
   isValidPathname,
   writeFile,
+  renameUsingTempPath,
   hasBruExtension,
   isDirectory,
   browseDirectory,
@@ -232,37 +233,34 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
       if (!fs.existsSync(oldPath)) {
         throw new Error(`path: ${oldPath} does not exist`);
       }
-      if (fs.existsSync(newPath)) {
-        throw new Error(`path: ${oldPath} already exists`);
+      if (fs.existsSync(newPath) && newPath === oldPath) {
+        throw new Error(`path: ${newPath} already exists`);
       }
 
-      // if its directory, rename and return
+      // if its a directory, rename
       if (isDirectory(oldPath)) {
         const bruFilesAtSource = await searchForBruFiles(oldPath);
 
-        for (let bruFile of bruFilesAtSource) {
+        bruFilesAtSource.forEach(async (bruFile) => {
           const newBruFilePath = bruFile.replace(oldPath, newPath);
           moveRequestUid(bruFile, newBruFilePath);
-        }
-        return fs.renameSync(oldPath, newPath);
+        });
+
+        await renameUsingTempPath(oldPath, newPath);
+      } else if (hasBruExtension(oldPath)) {
+        const data = fs.readFileSync(oldPath, 'utf8');
+        const jsonData = bruToJson(data);
+
+        jsonData.name = newName;
+
+        moveRequestUid(oldPath, newPath);
+
+        const content = jsonToBru(jsonData);
+        await writeFile(newPath, content);
+        await fs.unlinkSync(oldPath);
+      } else {
+        throw new Error(`File is not a bru file: ${oldPath}`);
       }
-
-      const isBru = hasBruExtension(oldPath);
-      if (!isBru) {
-        throw new Error(`path: ${oldPath} is not a bru file`);
-      }
-
-      // update name in file and save new copy, then delete old copy
-      const data = fs.readFileSync(oldPath, 'utf8');
-      const jsonData = bruToJson(data);
-
-      jsonData.name = newName;
-
-      moveRequestUid(oldPath, newPath);
-
-      const content = jsonToBru(jsonData);
-      await writeFile(newPath, content);
-      await fs.unlinkSync(oldPath);
     } catch (error) {
       return Promise.reject(error);
     }
@@ -294,6 +292,8 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         for (let bruFile of bruFilesAtSource) {
           deleteRequestUid(bruFile);
         }
+
+        deleteRequestUid(pathname);
 
         fs.rmSync(pathname, { recursive: true, force: true });
       } else if (['http-request', 'graphql-request'].includes(type)) {
