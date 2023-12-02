@@ -60,6 +60,16 @@ const writeFile = async (pathname, content) => {
   }
 };
 
+const renameUsingTempPath = async (oldPath, newPath) => {
+  try {
+    const tempPath = oldPath + '_temp';
+    await fs.promises.rename(oldPath, tempPath);
+    await fs.promises.rename(tempPath, newPath);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+};
+
 const writeBinaryFile = async (pathname, content) => {
   try {
     fs.writeFileSync(pathname, content);
@@ -142,6 +152,7 @@ module.exports = {
   isDirectory,
   normalizeAndResolvePath,
   writeFile,
+  renameUsingTempPath,
   writeBinaryFile,
   hasJsonExtension,
   hasBruExtension,
